@@ -41,7 +41,8 @@ class MyHomePage extends StatefulWidget {
  */
 class _MyHomePageState extends State<MyHomePage> {
   static const int ANIM_DURATION_IN_SECS = 2;
-  static const double ANIM_FOLD_ANGLE = 3.141592;
+  static const double ANIM_FOLD_ANGLE_X = 3.141592;
+  static const double ANIM_FOLD_ANGLE_Y = 3.141592;
 
   static const int NO_FOLDING = 0;
   static const int FOLDING_HORIZONTAL = 1;
@@ -64,8 +65,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initAnim() {
-    this._tweenRotaX = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
-    this._tweenRotaY = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
+    this._tweenRotaX = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE_X);
+    this._tweenRotaY = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE_Y);
   }
 
   void _stopMotion() {
@@ -88,7 +89,8 @@ class _MyHomePageState extends State<MyHomePage> {
     // RUNNING! so apply transformation
     if (this._folds >= FOLDING_HORIZONTAL) {
       return Matrix4.identity()
-        ..setEntry(3, 2, 0.03) //XXX: this one tilts the axis so we get a sort of side perspective
+        ..setEntry(3, 2,
+            0.03) //XXX: this one tilts the axis so we get a sort of side perspective
         ..rotateX(value);
 
       // IDLE! so no transform at all
@@ -102,13 +104,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (this._folds >= FOLDING_VERTICAL) {
       return Matrix4.identity()
+        ..setEntry(3, 2,
+            0.006) //XXX: this one tilts the axis so we get a sort of side perspective
         ..rotateY(value);
-
     } else {
       return Matrix4.identity();
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +121,7 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Column(
         mainAxisSize: MainAxisSize.max,
         children: [
-          this._buildFoldableContainer(),
+          Center(child: this._buildFoldableContainer()),
           Padding(
             padding: const EdgeInsets.all(_Dimens.MID_SPACING),
             child: RaisedButton(
@@ -145,61 +147,73 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildUpperDynamicContainer() {
-    if (this._folds <= 1) {
-      return this._buildPartialContainer(Colors.red, Alignment.topCenter, wFactor: 1.0);
-
+    if (this._folds <= FOLDING_HORIZONTAL) {
+      return this._buildPartialContainer(Colors.red, Alignment.topCenter,
+          wFactor: 1.0);
     } else {
       return Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(flex: 1,child: this._buildPartialContainer(Colors.red, Alignment.topCenter)),
-          //Flexible(flex: 1, child: this._buildPartialContainer(Colors.green, Alignment.topRight)),
-        ],
-      );
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            this._buildPartialContainer(Colors.red, Alignment.topLeft),
+            TweenAnimationBuilder(
+                duration: Duration(seconds: ANIM_DURATION_IN_SECS),
+                tween: this._tweenRotaY,
+                builder: (cntxt, value, child) {
+                  return Transform(
+                      transform: this._getMatrixForVerticalRotation(value),
+                      child: this._buildPartialContainer(
+                          Colors.red, Alignment.topRight));
+                })
+          ]);
     }
   }
 
   Widget _buildLowerDynamicContainer() {
-    if (this._folds == 0) {
-      return this._buildPartialContainer(Colors.yellow, Alignment.bottomCenter, wFactor: 1.0);
-
+    if (this._folds == NO_FOLDING) {
+      return this._buildPartialContainer(Colors.red, Alignment.bottomCenter,
+          wFactor: 1.0);
     } else {
       return TweenAnimationBuilder(
+        onEnd: () {
+          this._updateFolds(FOLDING_VERTICAL);
+        },
         tween: this._tweenRotaX,
         duration: Duration(seconds: ANIM_DURATION_IN_SECS),
         builder: (cntxt, value, child) {
           return Transform(
             transform: this._getMatrixForHorizontalRotation(value),
             child: Row(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(flex: 1,child: this._buildPartialContainer(Colors.blue, Alignment.bottomCenter)),
-                //Flexible(flex: 1, child: this._buildPartialContainer(Colors.yellow, Alignment.bottomRight))
-              ]),
-          ); 
-          },
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                      flex: 1,
+                      child: this._buildPartialContainer(
+                          Colors.red, Alignment.bottomCenter, wFactor: 1.0)),
+                  //Flexible(flex: 1, child: this._buildPartialContainer(Colors.yellow, Alignment.bottomRight))
+                ]),
+          );
+        },
       );
     }
   }
 
   Widget _buildDynamicContainer() {
     return Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-
           this._buildUpperDynamicContainer(),
-
-          this._buildLowerDynamicContainer(),
-        ]
-    );
+          Visibility(
+              visible: this._folds <= 1,
+              child: this._buildLowerDynamicContainer()),
+        ]);
   }
 
-  Widget _buildPartialContainer(Color color, Alignment alignment, {double wFactor = 0.5, double hFactor = 0.5}) {
+  Widget _buildPartialContainer(Color color, Alignment alignment,
+      {double wFactor = 0.5, double hFactor = 0.5}) {
     return Container(
-      width: double.maxFinite,
       color: color,
       child: ClipRect(
         child: Align(
