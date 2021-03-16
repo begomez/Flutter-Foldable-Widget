@@ -41,8 +41,7 @@ class MyHomePage extends StatefulWidget {
  */
 class _MyHomePageState extends State<MyHomePage> {
   static const int ANIM_DURATION_IN_SECS = 2;
-  static const double ANIM_FOLD_ANGLE_X = 3.141592;
-  static const double ANIM_FOLD_ANGLE_Y = 3.141592;
+  static const double ANIM_FOLD_ANGLE = 3.141592;
 
   static const int NO_FOLDING = 0;
   static const int FOLDING_HORIZONTAL = 1;
@@ -50,12 +49,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Tween<double> _tweenRotaX;
   Tween<double> _tweenRotaY;
-  int _folds = 0;
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
+  int _numFolds = 0;
 
   @override
   void initState() {
@@ -65,8 +59,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initAnim() {
-    this._tweenRotaX = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE_X);
-    this._tweenRotaY = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE_Y);
+    this._tweenRotaX = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
+    this._tweenRotaY = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
   }
 
   void _stopMotion() {
@@ -79,19 +73,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _updateFolds(int folds) {
     this.setState(() {
-      this._folds = folds;
+      this._numFolds = folds;
     });
   }
 
-  Matrix4 _getMatrixForHorizontalRotation(double value) {
+  Matrix4 _getTransformForHorizontalRotation(double value) {
     print("Current tween value on X: $value");
 
     // RUNNING! so apply transformation
-    if (this._folds >= FOLDING_HORIZONTAL) {
-      return Matrix4.identity()
-        ..setEntry(3, 2,
-            0.03) //XXX: this one tilts the axis so we get a sort of side perspective
-        ..rotateX(value);
+    if (this._isFoldingOnX()) {
+      return Matrix4.identity()..rotateX(value);
 
       // IDLE! so no transform at all
     } else {
@@ -99,10 +90,10 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Matrix4 _getMatrixForVerticalRotation(double value) {
+  Matrix4 _getTransformForVerticalRotation(double value) {
     print("Current tween value on Y: $value");
 
-    if (this._folds >= FOLDING_VERTICAL) {
+    if (this._isFoldingOnY()) {
       return Matrix4.identity()
         ..setEntry(3, 2,
             0.006) //XXX: this one tilts the axis so we get a sort of side perspective
@@ -138,30 +129,45 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _buildSomeContent() {
-    return Text('A', style: Theme.of(context).textTheme.headline1);
-  }
-
   Widget _buildFoldableContainer() {
-    return this._buildDynamicContainer();
+    return this._buildFoldableContent();
   }
 
-  Widget _buildUpperDynamicContainer() {
-    if (this._folds <= FOLDING_HORIZONTAL) {
+  Widget _buildFoldableContent() {
+    return Column(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          this._buildUpperFoldableContent(),
+          Visibility(
+              visible: this._numFolds <=
+                  FOLDING_HORIZONTAL, //XXX: hide part lower once it is completely folded over X
+              child: this._buildLowerFoldableContent()),
+        ]);
+  }
+
+  Widget _buildUpperFoldableContent() {
+    //XXX: still folding over X (or idle too, since we check folds <= 1...)
+    if (this._isFoldingOnX()) {
       return this._buildPartialContainer(Colors.red, Alignment.topCenter,
           wFactor: 1.0);
+
+      //XXX: done on X, folding over Y...
     } else {
       return Row(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // LEFT
             this._buildPartialContainer(Colors.red, Alignment.topLeft),
+
+            // RIGHT
             TweenAnimationBuilder(
                 duration: Duration(seconds: ANIM_DURATION_IN_SECS),
                 tween: this._tweenRotaY,
                 builder: (cntxt, value, child) {
                   return Transform(
-                      transform: this._getMatrixForVerticalRotation(value),
+                      transform: this._getTransformForVerticalRotation(value),
                       child: this._buildPartialContainer(
                           Colors.red, Alignment.topRight));
                 })
@@ -169,10 +175,13 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Widget _buildLowerDynamicContainer() {
-    if (this._folds == NO_FOLDING) {
+  Widget _buildLowerFoldableContent() {
+    //XXX: no operation
+    if (this._isIdle()) {
       return this._buildPartialContainer(Colors.red, Alignment.bottomCenter,
           wFactor: 1.0);
+
+      //XXX: folding over X...
     } else {
       return TweenAnimationBuilder(
         onEnd: () {
@@ -182,33 +191,14 @@ class _MyHomePageState extends State<MyHomePage> {
         duration: Duration(seconds: ANIM_DURATION_IN_SECS),
         builder: (cntxt, value, child) {
           return Transform(
-            transform: this._getMatrixForHorizontalRotation(value),
-            child: Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                      flex: 1,
-                      child: this._buildPartialContainer(
-                          Colors.red, Alignment.bottomCenter, wFactor: 1.0)),
-                  //Flexible(flex: 1, child: this._buildPartialContainer(Colors.yellow, Alignment.bottomRight))
-                ]),
+            transform: this._getTransformForHorizontalRotation(value),
+            child: this._buildPartialContainer(
+                Colors.red, Alignment.bottomCenter,
+                wFactor: 1.0),
           );
         },
       );
     }
-  }
-
-  Widget _buildDynamicContainer() {
-    return Column(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          this._buildUpperDynamicContainer(),
-          Visibility(
-              visible: this._folds <= 1,
-              child: this._buildLowerDynamicContainer()),
-        ]);
   }
 
   Widget _buildPartialContainer(Color color, Alignment alignment,
@@ -220,19 +210,27 @@ class _MyHomePageState extends State<MyHomePage> {
           alignment: alignment,
           heightFactor: hFactor,
           widthFactor: wFactor,
-          child: this._buildSomeContent(),
+          child: this._buildMoreContent(),
         ),
       ),
     );
   }
 
-  Widget _buildStaticContainer() {
-    return Container(
-        width: double.maxFinite,
-        alignment: Alignment.topCenter,
-        color: Colors.blue,
-        child: this._buildSomeContent());
+  Widget _buildMoreContent() => Image.network(
+        "https://flutter.dev/assets/dash/Dash-ac778c1736b6859410c8989c8d8e010d90b844b5df10f73b6d97fa1b7f0563f7.png",
+        width: 300,
+        fit: BoxFit.fill,
+      );
+
+  Widget _buildSomeContent() {
+    return Text('A', style: Theme.of(context).textTheme.headline1);
   }
+
+  bool _isIdle() => this._numFolds == NO_FOLDING;
+
+  bool _isFoldingOnX() => this._numFolds <= FOLDING_HORIZONTAL;
+
+  bool _isFoldingOnY() => this._numFolds >= FOLDING_VERTICAL;
 }
 
 abstract class _Dimens {
