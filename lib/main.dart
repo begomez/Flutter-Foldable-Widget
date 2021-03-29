@@ -59,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _initAnim() {
+    //XXX: always better NOT to store tweens on props, so we do not hold to their refs and avoid using them when not allowed
     this._tweenRotaX = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
     this._tweenRotaY = Tween<double>(begin: 0.0, end: ANIM_FOLD_ANGLE);
   }
@@ -96,7 +97,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (this._isFoldingOnY()) {
       return Matrix4.identity()
         ..setEntry(3, 2,
-            0.006) //XXX: this one tilts the axis so we get a sort of side perspective
+            0.03) //XXX: this one tilts the axis so we get a sort of side perspective
         ..rotateY(value);
     } else {
       return Matrix4.identity();
