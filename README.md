@@ -6,4 +6,4 @@ Foldable widget for Flutter.
 
 Sample project for article in:
 
-https://applicationnotresponding.wordpress.com
+https://applicationnotresponding.wordpress.com/2021/03/29/flutter-making-a-foldable-widget/
